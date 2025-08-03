@@ -1,0 +1,68 @@
+name: Build and Deploy WAR to S3
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  MAVEN_OPTS: "-B -DskipTests"
+
+jobs:
+  build:
+    name: Build Application
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Build with Maven
+        run: mvn ${{ env.MAVEN_OPTS }} clean package
+
+      - name: Upload WAR Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          path: target/veera-app.war
+          retention-days: 1
+
+  aws-upload:
+    name: Upload to S3
+    needs: build
+    runs-on: ubuntu-latest
+    environment: production  # Optional: Use environments for protection
+    steps:
+      - name: Download WAR Artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: artifact
+          path: target
+
+      - name: Verify WAR File
+        run: |
+          echo "✅ Step 2: List received artifacts"
+          ls -la target/
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1  # Change if needed
+
+      - name: Upload to S3
+        run: |
+          echo "✅ Step 3: Uploading target/veera-app.war to S3"
+          if [ -f "target/veera-app.war" ]; then
+            aws s3 cp target/veera-app.war s3://jeetrakeshcombinedwork/jeet-path/veera-app.war
+            echo "🎉 Upload successful!"
+          else
+            echo "❌ ERROR: target/veera-app.war not found!"
+            exit 1
+          fi
