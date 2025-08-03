@@ -1,0 +1,36 @@
+stages:
+  - build
+  - aws
+
+variables:
+  MAVEN_CLI_OPTS: "-B -DskipTests"
+
+cache:
+  paths:
+    - .m2/repository
+
+image: maven:3.9-eclipse-temurin-17
+
+before_script:
+  - echo "Using Maven version:"
+  - mvn -v
+
+build:
+  stage: build
+  script:
+    - mvn $MAVEN_CLI_OPTS clean package
+  artifacts:
+    paths:
+      - target/*.war
+    expire_in: 1h
+
+aws-upload:
+  stage: aws
+  image: amazon/aws-cli:latest
+  script:
+    - echo "Uploading to S3..."
+    - aws --version
+    - ls -la target/
+    - aws s3 cp target/veera-app.war s3://jeetrakeshcombinedwork/jeet-path/veera-app.war
+  only:
+    - main
